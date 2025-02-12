@@ -5,4 +5,10 @@ export interface Command {
   action: (msg: Message) => Promise<void>
 }
 
-export type SearchRecipe = (query: string, number: number) => Promise<result>
+export type SearchRecipe = (recipeName: string, extraIngredients: string[], number: number) => responseData
+
+export interface UserState {
+  step?: string
+  recipe?: string
+  ingredients?: string[]
+}

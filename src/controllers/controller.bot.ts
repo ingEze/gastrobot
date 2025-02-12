@@ -1,39 +1,46 @@
-import searchRecipeService from '../services/service.api.js'
+import { searchRecipeService } from '../services/service.api'
 
 const getAllRecipes = async (query: string, number: number): Promise<any> => {
   try {
-    if (query === null || number === null) {
+    if (query === undefined || number === undefined) {
       return {
         success: false,
         message: 'Please provide a query and a number'
       }
     }
 
-    console.log('query', query)
-    console.log('number', number)
+    const extraIngredients: string[] = []
+    const response = await searchRecipeService(query, extraIngredients, number)
 
-    const response = await searchRecipeService(query, number)
-    const { result } = response
+    if (response === false || response.result === false || !Array.isArray(response.result.results)) {
+      return {
+        success: false,
+        message: 'Invalid response from API'
+      }
+    }
 
-    const recipesMap = result.results.map((recipe: any) => ({
+    const recipesMap = response.result.results.map((recipe: any) => ({
       title: recipe.title,
       image: recipe.image
     }))
-    console.log('recipesMap', recipesMap)
 
-    const recipes = {
-      recipes: recipesMap
-    }
-
-    if (recipes.recipes.length === 0) {
+    if (recipesMap.length === 0) {
       return {
+        success: false,
         message: 'No recipes found'
       }
     }
 
-    return recipes
+    return {
+      success: true,
+      recipes: recipesMap
+    }
   } catch (err) {
-    console.error(err)
+    console.error('Error in getAllRecipes:', err)
+    return {
+      success: false,
+      message: 'An error ocurred while fetching recipes'
+    }
   }
 }
 
