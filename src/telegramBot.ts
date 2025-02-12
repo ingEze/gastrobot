@@ -50,13 +50,7 @@ const commands: Record<string, Command> = {
   },
   '/recipe': {
     description: 'Search a recipe',
-    action: async (msg: Message) => {
-      await bot.sendMessage(
-        msg.chat.id,
-        await getRecipies()
-
-      ).catch(console.error)
-    }
+    action: handleRecipeCommand
   }
   // '/add': {
   //   description: 'Add a ingredient',
@@ -73,57 +67,64 @@ const commands: Record<string, Command> = {
   // },
 }
 
-const getRecipies = async (): Promise<string> => {
-  const userState: Record<number, { step: string, number?: number }> = {}
-  return await new Promise((resolve, reject) => {
-    bot.onText(/\/recipe/, (msg: Message) => {
-      const chatId = msg.chat.id
-      bot.sendMessage(chatId, 'Insert a number of recipes').catch(console.error)
-      userState[chatId] = { step: 'waiting_for_user' }
-    })
+const userState = new Map<number, { step: string, recipe?: string }>()
 
-    bot.on('message', async (msg: Message) => {
-      const chatId = msg.chat.id
-      const text = msg.text?.trim() ?? ''
+async function handleRecipeCommand (msg: Message): Promise<void> {
+  const chatId = msg.chat.id
 
-      if (text === null || ((msg.text?.startsWith('/')) ?? false)) {
-        return
+  userState.delete(chatId)
+  userState.set(chatId, { step: 'waiting_for_recipe' })
+  await bot.sendMessage(chatId, 'Insert a recipe name').catch(console.error)
+}
+
+const handleRecipeMessage = async (msg: Message): Promise<void> => {
+  const chatId = msg.chat.id
+  const text: string = msg.text?.trim() ?? ''
+
+  if (text === null || text.startsWith('/')) return
+
+  const currentState = userState.get(chatId)
+  if (currentState === null) return
+
+  try {
+    switch (currentState?.step) {
+      case 'waiting_for_recipe': {
+        userState.set(chatId, { step: 'waiting_for_number', recipe: text })
+        await bot.sendMessage(chatId, 'Insert a number of recipes').catch(console.error)
+        break
       }
 
-      if (userState[chatId]?.step === 'waiting_for_user') {
-        const number = parseInt(text, 10)
-        if (isNaN(number)) {
-          bot.sendMessage(chatId, 'Please enter a valid number').catch(console.error)
+      case 'waiting_for_number': {
+        const number = parseInt(text, 10) ?? 1
+        if (isNaN(number) || number <= 0) {
+          await bot.sendMessage(chatId, 'Please enter a valid number greater than 0').catch(console.error)
           return
         }
 
-        userState[chatId] = { step: 'waiting_for_recipe', number }
-        bot.sendMessage(chatId, 'Insert a recipe').catch(console.error)
-        return
-      }
+        const recipe = currentState.recipe ?? ''
+        const response = await getAllRecipes(recipe, number)
+        if (response.recipes === null || response.recipes.length === 0) {
+          await bot.sendMessage(chatId, 'No recipes found').catch(console.error)
+        } else {
+          const recipiesFormatted = response.recipes
+            .slice(0, number)
+            .map((r: { title: string, image: string }, index: number) =>
+              `🍽️ Recipe ${index + 1}: ${r.title}\n🔗 ${r.image}`
+            )
+            .join('\n\n')
 
-      if (userState[chatId]?.step === 'waiting_for_recipe') {
-        const recipe: string = text
-        const number = userState[chatId].number ?? 1
-
-        try {
-          const response: { recipes: Array<{ title: string, image: string }> } = await getAllRecipes(recipe, number)
-          if (response.recipes === null || response.recipes.length === 0) {
-            resolve('No recipes found')
-          } else {
-            const recipiesFormatted = response.recipes
-              .slice(0, number)
-              .map((r, index) => `🍽️ Recipe ${index + 1}: ${r.title}\n🔗 ${r.image}`)
-              .join('\n\n')
-
-            resolve(recipiesFormatted)
-          }
-        } catch (err) {
-          reject(err)
+          await bot.sendMessage(chatId, recipiesFormatted).catch(console.error)
         }
+
+        userState.delete(chatId)
+        break
       }
-    })
-  })
+    }
+  } catch (err) {
+    console.error('Error handling recipe message', err)
+    await bot.sendMessage(chatId, 'An error occurred while processing your request').catch(console.error)
+    userState.delete(chatId)
+  }
 }
 
 bot.onText(/\/\w+/, (msg: Message, match: RegExpMatchArray | null) => {
@@ -145,6 +146,8 @@ bot.onText(/\/\w+/, (msg: Message, match: RegExpMatchArray | null) => {
     }
   }
 })
+
+bot.on('message', handleRecipeMessage)
 
 bot.on('polling_error', (err: Error) => {
   console.log(err.message)

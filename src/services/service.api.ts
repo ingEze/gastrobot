@@ -6,7 +6,7 @@ const searchRecipeService: SearchRecipe = async (query: string, number: number) 
   const url = `https://api.spoonacular.com/recipes/complexSearch?query=${query}&number=${number}&apiKey=${API_KEY}`
 
   if (query === null || number === null || API_KEY === null) throw new Error('Please provide a query and a number')
-  //   if (query !== string || number !== number) throw new Error('Please provide a query and a number')
+  if (typeof query !== 'string' || typeof number !== 'number') throw new Error('Please provide a query and a number')
 
   try {
     const response = await axios.get(url)

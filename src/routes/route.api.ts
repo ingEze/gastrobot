@@ -1,9 +1,9 @@
-import { Router } from 'express'
+// import { Router } from 'express'
 
-import getAllRecipes from '../controllers/controller.bot.js'
+// import getAllRecipes from '../controllers/controller.bot.js'
 
-const apiRouter = Router()
+// const apiRouter = Router()
 
-apiRouter.get('/recipe', getAllRecipes)
+// apiRouter.get('/recipe', getAllRecipes)
 
-export default apiRouter
+// export default apiRouter
