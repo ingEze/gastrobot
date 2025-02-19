@@ -1,6 +1,7 @@
 import { searchRecipeService } from '../services/service.api'
+import { SearchRecipe } from '../types'
 
-const getAllRecipes = async (query: string, number: number): Promise<any> => {
+const getAllRecipes: SearchRecipe = async (query, extraIngredients, number) => {
   try {
     if (query === undefined || number === undefined) {
       return {
@@ -9,9 +10,7 @@ const getAllRecipes = async (query: string, number: number): Promise<any> => {
       }
     }
 
-    const extraIngredients: string[] = []
     const response = await searchRecipeService(query, extraIngredients, number)
-    console.log('response', response)
 
     if (response === false) {
       return {
@@ -20,9 +19,10 @@ const getAllRecipes = async (query: string, number: number): Promise<any> => {
       }
     }
 
-    const recipesMap = response.map((recipe: any) => ({
+    const recipesMap = response.recipes.map((recipe: any) => ({
       title: recipe.title,
-      image: recipe.image
+      image: recipe.image,
+      ingredients: extraIngredients
     }))
 
     if (recipesMap.length === 0) {

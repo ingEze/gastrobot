@@ -3,29 +3,32 @@ import { SearchRecipe } from '../types.js'
 
 const API_KEY = process.env.API_KEY ?? ''
 
-export const searchRecipeService: SearchRecipe = async (recipeName: string, extraIngredients: string[] = [], number: number) => {
+export const searchRecipeService: SearchRecipe = async (recipeName, extraIngredients, number) => {
   try {
+    if (recipeName === null || typeof recipeName !== 'string') throw new Error('Recipe name is invalid')
+    if (!Array.isArray(extraIngredients)) throw new Error('Extra ingredients must be an array')
+    if (typeof number !== 'number' || number <= 0) throw new Error('Number must be a positive value')
+    if (API_KEY === null) throw new Error('KEY not valid')
+
+    const ingredientsValue = extraIngredients.length > 0 ? extraIngredients.join(', ') : ''
+
     const params = {
       query: recipeName,
-      includeIngredients: extraIngredients.join(','),
+      includeIngredients: ingredientsValue,
       number,
       apiKey: API_KEY
     }
 
-    console.log('params', params)
-
     const response = await axios.get('https://api.spoonacular.com/recipes/complexSearch', { params })
 
-    if (recipeName === null || API_KEY === null) throw new Error('Please provide a query and a number')
-    if (typeof recipeName !== 'string') throw new Error('Please provide a query and a number')
-
-    if (extraIngredients.length > 0) {
-      if (typeof extraIngredients !== 'string') throw new Error('Extra ingredients be a string')
-    }
+    if (response.data === false || response.data.results === false) throw new Error('Invalid API response')
 
     const responseData = await response.data.results
 
-    return responseData
+    return {
+      recipes: responseData,
+      extraIngredients
+    }
   } catch (err) {
     console.error('Error searching recipe:', err)
     return []

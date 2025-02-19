@@ -10,6 +10,7 @@ const bot = new TelegramBot(TOKEN_TELEGRAM, { polling: true })
 const userState = new Map<number, UserState | undefined>()
 
 // class to handle all bot messages and commands
+// eslint-disable-next-line @typescript-eslint/no-extraneous-class
 class MessageHandlers {
   static async sendWelcomeMessage (msg: Message): Promise<void> {
     const userName = msg.from?.first_name ?? 'User'
@@ -52,20 +53,39 @@ class MessageHandlers {
     const chatId = msg.chat.id
     const text: string = msg.text?.trim() ?? ''
 
-    if (text === null || text.startsWith('/')) return
+    if (text === undefined || text.startsWith('/')) return
 
     const currentState = userState.get(chatId)
     if (currentState == null) return
 
+    let queryText: string | null = null
+
     try {
       switch (currentState.step) {
         case 'waiting_for_recipe': {
+          queryText = text
           userState.set(chatId, {
-            step: 'waiting_for_number',
-            recipe: text,
+            step: 'waiting_for_ingredients',
+            recipe: queryText,
             ingredients: []
           })
-          await bot.sendMessage(chatId, '¿Cuántas recetas quieres ver? 🔢')
+          await bot.sendMessage(chatId, '¿Deseas buscar con algún ingrediente en especial? 🤔')
+          break
+        }
+
+        case 'waiting_for_ingredients': {
+          const userData = userState.get(chatId)
+          if (userData == null) {
+            await bot.sendMessage(chatId, 'Hubo un error, por favor intenta nuevamente.')
+            break
+          }
+
+          userState.set(chatId, {
+            step: 'waiting_for_number',
+            recipe: userData?.recipe,
+            ingredients: [...((userData.ingredients) ?? []), text]
+          })
+          await bot.sendMessage(chatId, '¿Cúantas recetas deseas buscar? 🔢')
           break
         }
 
@@ -77,19 +97,49 @@ class MessageHandlers {
           }
 
           const recipe = currentState.recipe ?? ''
-          const response = await getAllRecipes(recipe, number)
+          const extraIngredients = currentState.ingredients ?? []
+          const response = await getAllRecipes(recipe, extraIngredients, number)
 
           if (response.recipes?.length === 0) {
             await bot.sendMessage(chatId, 'No encontré recetas con esos criterios 😔')
           } else {
-            const recipesFormatted: string = response.recipes
-              .slice(0, number)
-              .map((r: { title: string, image: string }, index: number) =>
-                `🍽️ Receta ${index + 1}: ${r.title}\n🔗 ${r.image}`
-              )
-              .join('\n\n')
+            const formatRecipes = (recipes: Array<{ title: string, image: string }>, limit: number): string => {
+              return recipes
+                .slice(0, limit)
+                .map((recipe, index) => {
+                  const recipeNumber = String(index + 1)
+                  return [
+                    `📝 Receta #${recipeNumber}`,
+                    `🍳 ${String(recipe.title)}`,
+                    `🖼️ ${String(recipe.image)}`
+                  ].join('\n')
+                })
+                .join('\n\n')
+            }
 
-            await bot.sendMessage(chatId, `¡Aquí tienes tus recetas! 🎉\n\n${recipesFormatted}`)
+            const formatIngredients = (recipes: Array<{ ingredients: string }>): string => {
+              const uniqueIngredients = Array.from(
+                new Set(
+                  recipes
+                    .map(r => r.ingredients)
+                    .flat()
+                )
+              )
+              // Aseguramos que cada ingrediente sea string
+              return `🧂 Ingredientes: ${uniqueIngredients.map(String).join(' • ')}`
+            }
+
+            await bot.sendMessage(
+              chatId,
+              [
+                '🌟 ¡Aquí tienes tus recetas! 🌟',
+                '',
+                String(formatRecipes(response.recipes, number)),
+                '',
+                String(formatIngredients(response.recipes))
+              ].join('\n'),
+              { disable_web_page_preview: true }
+            )
           }
 
           userState.delete(chatId)
@@ -123,7 +173,7 @@ class MessageHandlers {
     userData.ingredients.push(ingredient)
     userState.set(chatId, userData)
 
-    const updateRecipes = await getAllRecipes(userData.recipe ?? '', userData.ingredients.length)
+    const updateRecipes = await getAllRecipes(userData.recipe ?? '', userData.ingredients, userData.ingredients.length)
 
     let message = `✅ Ingrediente "${ingredient}" añadido.\n\n🍽️ Recetas actualizadas:\n`
     updateRecipes.forEach((r: { title: string, image: string }, index: number) => {
