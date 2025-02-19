@@ -11,15 +11,16 @@ const getAllRecipes = async (query: string, number: number): Promise<any> => {
 
     const extraIngredients: string[] = []
     const response = await searchRecipeService(query, extraIngredients, number)
+    console.log('response', response)
 
-    if (response === false || response.result === false || !Array.isArray(response.result.results)) {
+    if (response === false) {
       return {
         success: false,
         message: 'Invalid response from API'
       }
     }
 
-    const recipesMap = response.result.results.map((recipe: any) => ({
+    const recipesMap = response.map((recipe: any) => ({
       title: recipe.title,
       image: recipe.image
     }))

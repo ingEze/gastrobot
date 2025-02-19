@@ -1,16 +1,19 @@
 import TelegramBot, { Message } from 'node-telegram-bot-api'
 import { config } from './config/config.js'
 import { Command, UserState } from './types.js'
-import getAllRecipes from './controllers/controller.bot.js'
+import getAllRecipes from './controllers/controller.api.js'
 
 const TOKEN_TELEGRAM: string = config.TOKEN_BOT ?? ''
 const bot = new TelegramBot(TOKEN_TELEGRAM, { polling: true })
+
+// map to maintain the state of each user by their chatId
 const userState = new Map<number, UserState | undefined>()
 
+// class to handle all bot messages and commands
 class MessageHandlers {
   static async sendWelcomeMessage (msg: Message): Promise<void> {
-    const userName = msg.from?.first_name ?? 'Usuario'
-    const welcomeMessage = `
+    const userName = msg.from?.first_name ?? 'User'
+    const WELCOME_MESSAGE = `
 ¡Hola ${userName}! 👋 Soy GastroBot, tu asistente culinario personal.
 
 ¿Qué te gustaría hacer?
@@ -21,7 +24,21 @@ class MessageHandlers {
 
 ¡Empecemos a cocinar! 🍳
     `
-    await bot.sendMessage(msg.chat.id, welcomeMessage)
+    await bot.sendMessage(msg.chat.id, WELCOME_MESSAGE)
+  }
+
+  static async handleHelpCommand (msg: Message): Promise<void> {
+    const header = '🌟 *¡Bienvenido a GastroBot!* 🌟\n\nAquí tienes los comandos disponibles:\n\n'
+
+    const commandList = Object.values(commands)
+      .map(cmd => `${cmd.emoji} ${cmd.command} - ${cmd.description}`)
+      .join('\n')
+
+    const footer = '\n\n👉 ¡Explora y disfruta de todas las funcionalidades que GastroBot tiene para ofrecerte! 😊'
+
+    const message = header + commandList + footer
+
+    await bot.sendMessage(msg.chat.id, message, { parse_mode: 'Markdown' })
   }
 
   static async handleRecipeStart (msg: Message): Promise<void> {
@@ -119,22 +136,22 @@ class MessageHandlers {
 
 const commands: Record<string, Command> = {
   '/start': {
+    command: '/start',
     description: 'Iniciar el bot',
-    action: MessageHandlers.sendWelcomeMessage
+    action: MessageHandlers.sendWelcomeMessage,
+    emoji: '🚀'
   },
   '/help': {
+    command: '/help',
     description: 'Ver comandos disponibles',
-    action: async (msg: Message) => {
-      const availableCommands = Object.entries(commands)
-        .map(([command, details]) => `${command} - ${details.description}`)
-        .join('\n')
-      await bot.sendMessage(msg.chat.id, `Comandos disponibles:\n${availableCommands}`)
-    }
+    action: MessageHandlers.handleHelpCommand,
+    emoji: '❓'
   },
   '/about': {
+    command: '/about',
     description: 'Acerca de GastroBot',
     action: async (msg: Message) => {
-      const aboutMessage = `
+      const ABOUT_MESSAGE = `
 🤖 GastroBot - Tu Asistente Culinario AI 🍳
 
 ¡Hola! Soy GastroBot, tu compañero inteligente en la cocina.
@@ -152,23 +169,23 @@ GitHub: https://github.com/ingEze
 
 ¡Comencemos a cocinar! 🥘
       `
-      await bot.sendMessage(msg.chat.id, aboutMessage)
-    }
+      await bot.sendMessage(msg.chat.id, ABOUT_MESSAGE)
+    },
+    emoji: '❕'
   },
   '/recipe': {
+    command: '/recipe',
     description: 'Buscar una receta',
-    action: MessageHandlers.handleRecipeStart
+    action: MessageHandlers.handleRecipeStart,
+    emoji: '🔍'
   },
   '/add': {
+    command: '/add',
     description: 'Añadir un ingrediente',
-    action: MessageHandlers.handleAddIngredient
+    action: MessageHandlers.handleAddIngredient,
+    emoji: '➕'
   }
 }
-
-bot.on('message', (msg: Message) => {
-  if ((msg.text?.startsWith('/')) ?? false) return
-  MessageHandlers.handleRecipeFlow(msg).catch(console.error)
-})
 
 bot.onText(/\/\w+/, (msg: Message, match: RegExpMatchArray | null) => {
   if (match == null) return
@@ -179,6 +196,11 @@ bot.onText(/\/\w+/, (msg: Message, match: RegExpMatchArray | null) => {
   } else {
     bot.sendMessage(msg.chat.id, 'Comando desconocido ❌').catch(console.error)
   }
+})
+
+bot.on('message', (msg: Message) => {
+  if ((msg.text?.startsWith('/')) ?? false) return
+  MessageHandlers.handleRecipeFlow(msg).catch(console.error)
 })
 
 bot.onText(/\/add (.+)/, (msg: Message, match: RegExpMatchArray | null) => {

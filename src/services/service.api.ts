@@ -16,11 +16,14 @@ export const searchRecipeService: SearchRecipe = async (recipeName: string, extr
 
     const response = await axios.get('https://api.spoonacular.com/recipes/complexSearch', { params })
 
-    if (recipeName === null || extraIngredients === null || API_KEY === null) throw new Error('Please provide a query and a number')
-    if (typeof recipeName !== 'string' || typeof extraIngredients !== 'string') throw new Error('Please provide a query and a number')
+    if (recipeName === null || API_KEY === null) throw new Error('Please provide a query and a number')
+    if (typeof recipeName !== 'string') throw new Error('Please provide a query and a number')
+
+    if (extraIngredients.length > 0) {
+      if (typeof extraIngredients !== 'string') throw new Error('Extra ingredients be a string')
+    }
 
     const responseData = await response.data.results
-    console.log('responseData', responseData)
 
     return responseData
   } catch (err) {
