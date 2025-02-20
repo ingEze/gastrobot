@@ -1,4 +1,5 @@
 import { Message } from 'node-telegram-bot-api'
+import { Document } from 'mongoose'
 
 export interface Command {
   command: string
@@ -14,3 +15,11 @@ export interface UserState {
   recipe?: string
   ingredients?: string[]
 }
+
+export interface IRecipeFavorite extends Document {
+  query: string
+  url: string
+  recipeType: string
+}
+
+export type AddRecipeFavorite = (query: string, url: string, recipeType: string) => Promise<void>

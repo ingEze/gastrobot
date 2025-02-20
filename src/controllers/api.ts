@@ -1,4 +1,4 @@
-import { searchRecipeService } from '../services/service.api'
+import { searchRecipeService } from '../services/api'
 import { SearchRecipe } from '../types'
 
 const getAllRecipes: SearchRecipe = async (query, extraIngredients, number) => {

@@ -1,16 +1,16 @@
 import express from 'express'
 import dotenv from 'dotenv'
 
-import connectDB from './config/db.js'
-
 import './telegramBot.js'
+import Database from './config/db'
 
 dotenv.config()
 
 const app = express()
 app.use(express.json())
 
-connectDB().catch(console.error)
+// connect to MongoDB database
+Database.getInstance()
 
 const PORT = process.env.PORT ?? 3000
 

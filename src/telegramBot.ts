@@ -1,7 +1,7 @@
 import TelegramBot, { Message } from 'node-telegram-bot-api'
 import { config } from './config/config.js'
 import { Command, UserState } from './types.js'
-import getAllRecipes from './controllers/controller.api.js'
+import getAllRecipes from './controllers/api.js'
 
 const TOKEN_TELEGRAM: string = config.TOKEN_BOT ?? ''
 const bot = new TelegramBot(TOKEN_TELEGRAM, { polling: true })
@@ -9,7 +9,7 @@ const bot = new TelegramBot(TOKEN_TELEGRAM, { polling: true })
 // map to maintain the state of each user by their chatId
 const userState = new Map<number, UserState | undefined>()
 
-// class to handle all bot messages and commands
+// //////////////////////////////// class to handle all bot messages and commands /////////////////////////////////
 // eslint-disable-next-line @typescript-eslint/no-extraneous-class
 class MessageHandlers {
   static async sendWelcomeMessage (msg: Message): Promise<void> {
@@ -153,34 +153,8 @@ class MessageHandlers {
     }
   }
 
-  static async handleAddIngredient (msg: Message): Promise<void> {
+  static async handleFavoriteRecipe (msg: Message): Promise<void> {
     const chatId = msg.chat.id
-
-    const ingredient = msg.text?.split(' ').slice(1).join(' ')
-
-    if (ingredient === undefined) {
-      await bot.sendMessage(chatId, 'Por favor, especifica un ingrediente. Ejemplo: /add tomato 🍅')
-      return
-    }
-
-    const userData = userState.get(chatId)
-    if (userData == null) {
-      await bot.sendMessage(chatId, 'Primero busca una receta con /recipe 😊')
-      return
-    }
-
-    userData.ingredients = userData.ingredients ?? []
-    userData.ingredients.push(ingredient)
-    userState.set(chatId, userData)
-
-    const updateRecipes = await getAllRecipes(userData.recipe ?? '', userData.ingredients, userData.ingredients.length)
-
-    let message = `✅ Ingrediente "${ingredient}" añadido.\n\n🍽️ Recetas actualizadas:\n`
-    updateRecipes.forEach((r: { title: string, image: string }, index: number) => {
-      message += `${index + 1}. ${r.title}\n🔗 ${r.image}\n\n`
-    })
-
-    await bot.sendMessage(chatId, message)
   }
 }
 
@@ -229,11 +203,11 @@ GitHub: https://github.com/ingEze
     action: MessageHandlers.handleRecipeStart,
     emoji: '🔍'
   },
-  '/add': {
-    command: '/add',
-    description: 'Añadir un ingrediente',
-    action: MessageHandlers.handleAddIngredient,
-    emoji: '➕'
+  '/favorite': {
+    command: '/favorite',
+    description: 'Your recipes favorites',
+    action: MessageHandlers.handleFavoriteRecipe,
+    emoji: '🤩'
   }
 }
 
@@ -251,11 +225,6 @@ bot.onText(/\/\w+/, (msg: Message, match: RegExpMatchArray | null) => {
 bot.on('message', (msg: Message) => {
   if ((msg.text?.startsWith('/')) ?? false) return
   MessageHandlers.handleRecipeFlow(msg).catch(console.error)
-})
-
-bot.onText(/\/add (.+)/, (msg: Message, match: RegExpMatchArray | null) => {
-  if (match == null) return
-  MessageHandlers.handleAddIngredient(msg).catch(console.error)
 })
 
 bot.on('polling_error', (error: Error) => {
