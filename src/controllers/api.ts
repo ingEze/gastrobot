@@ -20,6 +20,7 @@ const getAllRecipes: SearchRecipe = async (query, extraIngredients, number) => {
     }
 
     const recipesMap = response.recipes.map((recipe: any) => ({
+      id: recipe.id,
       title: recipe.title,
       image: recipe.image,
       ingredients: extraIngredients

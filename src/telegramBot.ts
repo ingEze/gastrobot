@@ -9,7 +9,9 @@ const bot = new TelegramBot(TOKEN_TELEGRAM, { polling: true })
 // map to maintain the state of each user by their chatId
 const userState = new Map<number, UserState | undefined>()
 
-// //////////////////////////////// class to handle all bot messages and commands /////////////////////////////////
+// map to temporarily store the title and ID of the recipes requested by the user
+const userRecipes: Record<number, Map<number, string>> = {}
+
 // eslint-disable-next-line @typescript-eslint/no-extraneous-class
 class MessageHandlers {
   static async sendWelcomeMessage (msg: Message): Promise<void> {
@@ -19,7 +21,6 @@ class MessageHandlers {
 
 ¿Qué te gustaría hacer?
 🔍 /recipe - Buscar una receta
-➕ /add - Añadir un ingrediente
 ❓ /help - Ver todos los comandos disponibles
 ℹ️ /about - Conocer más sobre mí
 
@@ -95,7 +96,6 @@ class MessageHandlers {
             await bot.sendMessage(chatId, 'Por favor, ingresa un número válido mayor que 0 ❌')
             return
           }
-
           const recipe = currentState.recipe ?? ''
           const extraIngredients = currentState.ingredients ?? []
           const response = await getAllRecipes(recipe, extraIngredients, number)
@@ -103,7 +103,9 @@ class MessageHandlers {
           if (response.recipes?.length === 0) {
             await bot.sendMessage(chatId, 'No encontré recetas con esos criterios 😔')
           } else {
-            const formatRecipes = (recipes: Array<{ title: string, image: string }>, limit: number): string => {
+            userRecipes[chatId] = new Map()
+
+            const formatRecipes = (recipes: Array<{ title: string, image: string, id: number }>, limit: number): string => {
               return recipes
                 .slice(0, limit)
                 .map((recipe, index) => {
@@ -125,7 +127,6 @@ class MessageHandlers {
                     .flat()
                 )
               )
-              // Aseguramos que cada ingrediente sea string
               return `🧂 Ingredientes: ${uniqueIngredients.map(String).join(' • ')}`
             }
 
@@ -138,7 +139,19 @@ class MessageHandlers {
                 '',
                 String(formatIngredients(response.recipes))
               ].join('\n'),
-              { disable_web_page_preview: true }
+              {
+                disable_web_page_preview: true,
+                reply_markup: {
+                  inline_keyboard: response.recipes.slice(0, number).map((recipe: { title: string, id: number }) => {
+                    userRecipes[chatId].set(recipe.id, recipe.title)
+
+                    return [{
+                      text: `🍳 ${recipe.title}`,
+                      callback_data: `show_recipe_${recipe.id}`
+                    }]
+                  })
+                }
+              }
             )
           }
 
@@ -154,7 +167,7 @@ class MessageHandlers {
   }
 
   static async handleFavoriteRecipe (msg: Message): Promise<void> {
-    const chatId = msg.chat.id
+    // const chatId = msg.chat.id
   }
 }
 
@@ -225,6 +238,24 @@ bot.onText(/\/\w+/, (msg: Message, match: RegExpMatchArray | null) => {
 bot.on('message', (msg: Message) => {
   if ((msg.text?.startsWith('/')) ?? false) return
   MessageHandlers.handleRecipeFlow(msg).catch(console.error)
+})
+
+bot.on('callback_query', async (callbackQuery) => {
+  const msg = callbackQuery.message
+  if (msg == null) return
+
+  const chatId = msg?.chat.id
+  const data = callbackQuery.data
+  const recipeId = Number(data?.split('_')[2])
+
+  const recipeName = userRecipes[chatId]?.get(recipeId) ?? 'Unknow recipe'
+
+  if ((data?.startsWith('show_recipe_')) ?? false) {
+    await bot.sendMessage(
+      chatId,
+      `📜 Detalles de la receta: ${recipeName}\n\nAquí vendrán los detalles de la receta...`
+    ).catch(console.error)
+  }
 })
 
 bot.on('polling_error', (error: Error) => {
