@@ -34,3 +34,20 @@ export const searchRecipeService: SearchRecipe = async (recipeName, extraIngredi
     return []
   }
 }
+
+export const getRecipeIdService = async (id: number): Promise<any> => {
+  console.log('response id', id)
+  try {
+    const response = await axios.get(`https://api.spoonacular.com/recipes/${id}/information?apiKey=${API_KEY}`)
+    console.log('response', response)
+    console.log('respose.data', response.data)
+
+    if (response.data === false) throw new Error('Invalid API response')
+
+    console.log(`URL llamada: https://api.spoonacular.com/recipes/${id}/information?apiKey=${API_KEY}`)
+
+    return response.data
+  } catch (err) {
+    console.error('Error getting recipe:', err)
+  }
+}

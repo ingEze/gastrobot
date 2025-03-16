@@ -1,7 +1,7 @@
-import { searchRecipeService } from '../services/api'
+import { getRecipeIdService, searchRecipeService } from '../services/api'
 import { SearchRecipe } from '../types'
 
-const getAllRecipes: SearchRecipe = async (query, extraIngredients, number) => {
+export const getAllRecipes: SearchRecipe = async (query, extraIngredients, number) => {
   try {
     if (query === undefined || number === undefined) {
       return {
@@ -46,4 +46,18 @@ const getAllRecipes: SearchRecipe = async (query, extraIngredients, number) => {
   }
 }
 
-export default getAllRecipes
+export const getRecipeId = async (id: number): Promise<any> => {
+  try {
+    const result = await getRecipeIdService(id)
+    console.log('result', result)
+
+    if (result === false) {
+      console.error('Error: No se pudo obtener la receta.')
+      return
+    }
+
+    return result
+  } catch (err) {
+    console.error('Error in getRecipeId:', err)
+  }
+}

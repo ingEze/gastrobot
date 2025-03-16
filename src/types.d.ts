@@ -22,4 +22,16 @@ export interface IRecipeFavorite extends Document {
   recipeType: string
 }
 
+export interface RecipeDetails {
+  id: number
+  title: string
+  summary?: string
+  instructions?: string
+  readyInMinutes?: number
+  servings?: number
+  spoonacularScore?: number
+  image?: string
+  // Añade otros campos que puedas necesitar
+}
+
 export type AddRecipeFavorite = (query: string, url: string, recipeType: string) => Promise<void>

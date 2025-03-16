@@ -1,7 +1,7 @@
 import TelegramBot, { Message } from 'node-telegram-bot-api'
 import { config } from './config/config.js'
-import { Command, UserState } from './types.js'
-import getAllRecipes from './controllers/api.js'
+import { Command, UserState, RecipeDetails } from './types.js'
+import { getAllRecipes, getRecipeId } from './controllers/api.js'
 
 const TOKEN_TELEGRAM: string = config.TOKEN_BOT ?? ''
 const bot = new TelegramBot(TOKEN_TELEGRAM, { polling: true })
@@ -246,15 +246,58 @@ bot.on('callback_query', async (callbackQuery) => {
 
   const chatId = msg?.chat.id
   const data = callbackQuery.data
-  const recipeId = Number(data?.split('_')[2])
+  if (data === null || data === undefined) return
 
-  const recipeName = userRecipes[chatId]?.get(recipeId) ?? 'Unknow recipe'
+  const recipeId = Number(data.split('_')[2])
+  if (isNaN(recipeId)) return
 
-  if ((data?.startsWith('show_recipe_')) ?? false) {
-    await bot.sendMessage(
-      chatId,
-      `📜 Detalles de la receta: ${recipeName}\n\nAquí vendrán los detalles de la receta...`
-    ).catch(console.error)
+  const recipeName = userRecipes[chatId]?.get(recipeId) ?? 'Receta desconocida'
+
+  if (data.startsWith('show_recipe_')) {
+    try {
+      // Usa la solución 1 (getRecipeById) y asegúrate de que devuelva el tipo correcto
+      const recipe = await getRecipeId(recipeId) as RecipeDetails
+
+      if (recipe === null || recipe === undefined) {
+        await bot.sendMessage(chatId, `No se pudo obtener información para: ${recipeName}`)
+        return
+      }
+
+      // Función auxiliar para sanitizar strings HTML de forma segura
+      const sanitizeHtml = (text: string | undefined): string => {
+        return (text != null) ? text.replace(/<\/?[^>]+(>|$)/g, '') : ''
+      }
+
+      // Función para manejar de forma segura valores que podrían ser undefined
+      const safeValue = <T>(value: T | undefined, defaultValue: string): string => {
+        if (value === undefined || value === null) return defaultValue
+        return String(value)
+      }
+
+      const formattedMessage = [
+        `📜 *Detalles de la receta: ${recipeName}*`,
+        '',
+        (recipe.summary != null) ? `📝 *Resumen:* ${sanitizeHtml(recipe.summary)}` : '',
+        '',
+        (recipe.instructions != null)
+          ? `👨‍🍳 *Instrucciones:* ${sanitizeHtml(recipe.instructions)}`
+          : '👨‍🍳 *Instrucciones:* No hay instrucciones disponibles',
+        '',
+        `⏱ *Tiempo de preparación:* ${safeValue(recipe.readyInMinutes, 'No especificado')} minutos`,
+        `👥 *Porciones:* ${safeValue(recipe.servings, 'No especificado')}`,
+        `❤️ *Puntuación:* ${(recipe.spoonacularScore != null)
+          ? recipe.spoonacularScore.toFixed(1)
+          : 'No disponible'}/100`
+      ].join('\n')
+
+      await bot.sendMessage(chatId, formattedMessage, {
+        parse_mode: 'Markdown',
+        disable_web_page_preview: true
+      })
+    } catch (error) {
+      console.error('Error al obtener detalles de la receta:', error)
+      await bot.sendMessage(chatId, `Ocurrió un error al obtener los detalles de: ${recipeName}`)
+    }
   }
 })
 
