@@ -49,7 +49,6 @@ export const getAllRecipes: SearchRecipe = async (query, extraIngredients, numbe
 export const getRecipeId = async (id: number): Promise<any> => {
   try {
     const result = await getRecipeIdService(id)
-    console.log('result', result)
 
     if (result === false) {
       console.error('Error: No se pudo obtener la receta.')

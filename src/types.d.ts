@@ -1,4 +1,4 @@
-import { Message } from 'node-telegram-bot-api'
+import TelegramBot, { Message } from 'node-telegram-bot-api'
 import { Document } from 'mongoose'
 
 export interface Command {
@@ -17,9 +17,9 @@ export interface UserState {
 }
 
 export interface IRecipeFavorite extends Document {
-  query: string
-  url: string
-  recipeType: string
+  recipeId: number
+  userId: number
+  addedAt: Date
 }
 
 export interface RecipeDetails {
@@ -31,7 +31,10 @@ export interface RecipeDetails {
   servings?: number
   spoonacularScore?: number
   image?: string
-  // Añade otros campos que puedas necesitar
 }
 
-export type AddRecipeFavorite = (query: string, url: string, recipeType: string) => Promise<void>
+export type AddRecipeFavorite = (recipeId: number, telegramId: number) => Promise<newRecipe>
+
+export type HandleFavoriteRecipe = (callbackQuery: TelegramBot.CallbackQuery, chatId: number, data: string) => Promise<void>
+
+export type HandleShowRecipe = (callbackQuery: TelegramBot.CallbackQuery, chatId: number, recipeId: number) => Promise<void>

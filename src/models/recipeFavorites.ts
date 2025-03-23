@@ -2,17 +2,17 @@ import mongoose from 'mongoose'
 import { IRecipeFavorite } from '../types'
 
 const RecipeFavorite = new mongoose.Schema<IRecipeFavorite>({
-  query: {
-    type: String,
+  recipeId: {
+    type: Number,
     require: true
   },
-  url: {
-    type: String,
+  userId: {
+    type: Number,
     require: true
   },
-  recipeType: {
-    type: String,
-    require: true
+  addedAt: {
+    type: Date,
+    default: Date.now
   }
 })
 

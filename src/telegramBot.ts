@@ -1,7 +1,8 @@
 import TelegramBot, { Message } from 'node-telegram-bot-api'
 import { config } from './config/config.js'
-import { Command, UserState, RecipeDetails } from './types.js'
+import { Command, UserState, RecipeDetails, HandleFavoriteRecipe, HandleShowRecipe } from './types.js'
 import { getAllRecipes, getRecipeId } from './controllers/api.js'
+import { handleAddFavorite } from './controllers/mongodb.js'
 
 const TOKEN_TELEGRAM: string = config.TOKEN_BOT ?? ''
 const bot = new TelegramBot(TOKEN_TELEGRAM, { polling: true })
@@ -166,8 +167,8 @@ class MessageHandlers {
     }
   }
 
-  static async handleFavoriteRecipe (msg: Message): Promise<void> {
-    // const chatId = msg.chat.id
+  static async handleFavoriteCommand (msg: Message): Promise<void> {
+    await bot.sendMessage(msg.chat.id, 'Aquí puedes ver tus recetas favoritas. Usa el comando /recipe primero para buscar y añadir favoritos.')
   }
 }
 
@@ -219,8 +220,81 @@ GitHub: https://github.com/ingEze
   '/favorite': {
     command: '/favorite',
     description: 'Your recipes favorites',
-    action: MessageHandlers.handleFavoriteRecipe,
+    action: MessageHandlers.handleFavoriteCommand,
     emoji: '🤩'
+  }
+}
+
+const handleShowRecipe: HandleShowRecipe = async (callbackQuery, chatId, recipeId) => {
+  try {
+    const recipe = await getRecipeId(recipeId) as RecipeDetails
+    const recipeName = userRecipes[chatId]?.get(recipeId) ?? 'Receta desconocida'
+
+    if (recipe === null || recipe === undefined) {
+      await bot.sendMessage(chatId, `No se pudo obtener información para: ${recipeName}`)
+      return
+    }
+
+    // Función auxiliar para sanitizar strings HTML de forma segura
+    const sanitizeHtml = (text: string | undefined): string => {
+      return (text != null) ? text.replace(/<\/?[^>]+(>|$)/g, '') : ''
+    }
+
+    // Función para manejar de forma segura valores que podrían ser undefined
+    const safeValue = <T>(value: T | undefined, defaultValue: string): string => {
+      if (value === undefined || value === null) return defaultValue
+      return String(value)
+    }
+
+    const formattedMessage = [
+      `📜 *Detalles de la receta: ${recipeName}*`,
+      '',
+      (recipe.summary != null) ? `📝 *Resumen:* ${sanitizeHtml(recipe.summary)}` : '',
+      '',
+      (recipe.instructions != null)
+        ? `👨‍🍳 *Instrucciones:* ${sanitizeHtml(recipe.instructions)}`
+        : '👨‍🍳 *Instrucciones:* No hay instrucciones disponibles',
+      '',
+      `⏱ *Tiempo de preparación:* ${safeValue(recipe.readyInMinutes, 'No especificado')} minutos`,
+      `👥 *Porciones:* ${safeValue(recipe.servings, 'No especificado')}`,
+      `❤️ *Puntuación:* ${(recipe.spoonacularScore != null)
+        ? recipe.spoonacularScore.toFixed(1)
+        : 'No disponible'}/100`
+    ].join('\n')
+
+    await bot.sendMessage(chatId, formattedMessage, {
+      parse_mode: 'Markdown',
+      disable_web_page_preview: true,
+      reply_markup: {
+        inline_keyboard: [
+          [{ text: '♥ Add to favorite', callback_data: `add_to_favorite_${recipeId}` }]
+        ]
+      }
+    })
+    console.log(`Botón de favoritos creado para: ${recipeId} con callback_data: add_to_favorite_${recipeId}`)
+    await bot.answerCallbackQuery(callbackQuery.id)
+  } catch (err) {
+    console.error('Error al obtener detalles de la receta:', err)
+    await bot.sendMessage(chatId, 'No se pudo obtener los detalles de la receta seleccionada')
+  }
+}
+
+const handleAddFavoriteRecipe: HandleFavoriteRecipe = async (callbackQuery, chatId, data) => {
+  try {
+    const recipeId = Number(data.split('_')[3])
+    if (isNaN(recipeId)) {
+      console.error(`ID de receta inválido: ${data.split('_')[3]}`)
+      return
+    }
+
+    const recipeName = userRecipes[chatId]?.get(recipeId) ?? 'Receta desconocida'
+
+    await handleAddFavorite(chatId, recipeId)
+    await bot.sendMessage(chatId, `¡Receta "${recipeName}" añadida a favoritos! ⭐`)
+    await bot.answerCallbackQuery(callbackQuery.id, { text: '¡Añadidos a favoritos!' })
+  } catch (err) {
+    console.error('Error al agregar a favoritos:', err)
+    await bot.sendMessage(chatId, '❌ Ocurrió un error al agregar la receta a favoritos.')
   }
 }
 
@@ -248,56 +322,12 @@ bot.on('callback_query', async (callbackQuery) => {
   const data = callbackQuery.data
   if (data === null || data === undefined) return
 
-  const recipeId = Number(data.split('_')[2])
-  if (isNaN(recipeId)) return
-
-  const recipeName = userRecipes[chatId]?.get(recipeId) ?? 'Receta desconocida'
-
   if (data.startsWith('show_recipe_')) {
-    try {
-      // Usa la solución 1 (getRecipeById) y asegúrate de que devuelva el tipo correcto
-      const recipe = await getRecipeId(recipeId) as RecipeDetails
-
-      if (recipe === null || recipe === undefined) {
-        await bot.sendMessage(chatId, `No se pudo obtener información para: ${recipeName}`)
-        return
-      }
-
-      // Función auxiliar para sanitizar strings HTML de forma segura
-      const sanitizeHtml = (text: string | undefined): string => {
-        return (text != null) ? text.replace(/<\/?[^>]+(>|$)/g, '') : ''
-      }
-
-      // Función para manejar de forma segura valores que podrían ser undefined
-      const safeValue = <T>(value: T | undefined, defaultValue: string): string => {
-        if (value === undefined || value === null) return defaultValue
-        return String(value)
-      }
-
-      const formattedMessage = [
-        `📜 *Detalles de la receta: ${recipeName}*`,
-        '',
-        (recipe.summary != null) ? `📝 *Resumen:* ${sanitizeHtml(recipe.summary)}` : '',
-        '',
-        (recipe.instructions != null)
-          ? `👨‍🍳 *Instrucciones:* ${sanitizeHtml(recipe.instructions)}`
-          : '👨‍🍳 *Instrucciones:* No hay instrucciones disponibles',
-        '',
-        `⏱ *Tiempo de preparación:* ${safeValue(recipe.readyInMinutes, 'No especificado')} minutos`,
-        `👥 *Porciones:* ${safeValue(recipe.servings, 'No especificado')}`,
-        `❤️ *Puntuación:* ${(recipe.spoonacularScore != null)
-          ? recipe.spoonacularScore.toFixed(1)
-          : 'No disponible'}/100`
-      ].join('\n')
-
-      await bot.sendMessage(chatId, formattedMessage, {
-        parse_mode: 'Markdown',
-        disable_web_page_preview: true
-      })
-    } catch (error) {
-      console.error('Error al obtener detalles de la receta:', error)
-      await bot.sendMessage(chatId, `Ocurrió un error al obtener los detalles de: ${recipeName}`)
-    }
+    const recipeId = Number(data.split('_')[2])
+    if (isNaN(recipeId)) return
+    await handleShowRecipe(callbackQuery, chatId, recipeId)
+  } else if (data.startsWith('add_to_favorite_')) {
+    await handleAddFavoriteRecipe(callbackQuery, chatId, data)
   }
 })
 

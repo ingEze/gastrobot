@@ -1,17 +1,27 @@
-// import recipeFavorites from '../models/recipeFavorites'
-// import { AddRecipeFavorite } from '../types'
+import { AddRecipeFavorite } from '../types'
+import RecipeFavoriteModel from '../models/recipeFavorites'
 
-// // eslint-disable-next-line @typescript-eslint/no-extraneous-class
-// const mongoDbService: AddRecipeFavorite = async (query, url, recipeType) => {
-//   try {
-//     const params = {
-//       query,
-//       url,
-//       recipeType
-//     }
+export const addFavorite: AddRecipeFavorite = async (recipeId, userId) => {
+  console.log('recipeId', recipeId)
+  console.log('userId', userId)
+  try {
+    const existingFavorite = await RecipeFavoriteModel.findOne({ userId, recipeId })
+    if (existingFavorite != null) {
+      return {
+        success: false,
+        message: 'This recipe already in your favorites'
+      }
+    }
 
-//     const
-//   } catch (err) {}
-// }
+    const newRecipe = new RecipeFavoriteModel({ userId, recipeId })
+    await newRecipe.save()
 
-// export default mongoDbService
+    return {
+      success: true,
+      message: 'Recipe added in your favorites.'
+    }
+  } catch (err) {
+    console.error('Error in DB service:', err)
+    throw err
+  }
+}
