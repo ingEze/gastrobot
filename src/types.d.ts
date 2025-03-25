@@ -18,8 +18,10 @@ export interface UserState {
 
 export interface IRecipeFavorite extends Document {
   recipeId: number
-  userId: number
+  userUniqueIdentifier: string
+  telegramId: number
   addedAt: Date
+  indexes?: string[]
 }
 
 export interface RecipeDetails {
@@ -33,7 +35,9 @@ export interface RecipeDetails {
   image?: string
 }
 
-export type AddRecipeFavorite = (recipeId: number, telegramId: number) => Promise<newRecipe>
+export type RecipeFavoriteFunction = (recipeId: number, telegramId: number, userUniqueIdentifier: string) => Promise<any>
+
+export type GetRecipeFunction = (telegramId: number, userUniqueIdentifier: string) => Promise<any>
 
 export type HandleFavoriteRecipe = (callbackQuery: TelegramBot.CallbackQuery, chatId: number, data: string) => Promise<void>
 

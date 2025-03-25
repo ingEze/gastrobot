@@ -10,7 +10,7 @@ const app = express()
 app.use(express.json())
 
 // connect to MongoDB database
-Database.getInstance()
+Database.getInstance().connect().catch(console.error)
 
 const PORT = process.env.PORT ?? 3000
 

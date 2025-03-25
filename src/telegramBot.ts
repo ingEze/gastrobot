@@ -2,7 +2,7 @@ import TelegramBot, { Message } from 'node-telegram-bot-api'
 import { config } from './config/config.js'
 import { Command, UserState, RecipeDetails, HandleFavoriteRecipe, HandleShowRecipe } from './types.js'
 import { getAllRecipes, getRecipeId } from './controllers/api.js'
-import { handleAddFavorite } from './controllers/mongodb.js'
+import { handleAddFavorite, handleGetFavorite } from './controllers/mongodb.js'
 
 const TOKEN_TELEGRAM: string = config.TOKEN_BOT ?? ''
 const bot = new TelegramBot(TOKEN_TELEGRAM, { polling: true })
@@ -168,7 +168,21 @@ class MessageHandlers {
   }
 
   static async handleFavoriteCommand (msg: Message): Promise<void> {
-    await bot.sendMessage(msg.chat.id, 'Aquí puedes ver tus recetas favoritas. Usa el comando /recipe primero para buscar y añadir favoritos.')
+    try {
+      const chatId = msg.chat.id
+
+      const header = '😍 Aquí puedes ver tus recetas favoritas. Usa el comando /recipe primero para buscar y añadir favoritos: 😍\n\n'
+
+      const favoriteRecipes = await handleGetFavorite(chatId)
+      console.log('favoriteRecipes TELEGRAMBOT', favoriteRecipes)
+      const footer = '\n\n👉 Selecciona la que quieras cocinar!'
+
+      const message = header + favoriteRecipes + footer
+
+      await bot.sendMessage(chatId, message)
+    } catch (err) {
+      console.error('Error al obtener las recetas favoritas:', err)
+    }
   }
 }
 
@@ -271,7 +285,6 @@ const handleShowRecipe: HandleShowRecipe = async (callbackQuery, chatId, recipeI
         ]
       }
     })
-    console.log(`Botón de favoritos creado para: ${recipeId} con callback_data: add_to_favorite_${recipeId}`)
     await bot.answerCallbackQuery(callbackQuery.id)
   } catch (err) {
     console.error('Error al obtener detalles de la receta:', err)
@@ -287,14 +300,18 @@ const handleAddFavoriteRecipe: HandleFavoriteRecipe = async (callbackQuery, chat
       return
     }
 
-    const recipeName = userRecipes[chatId]?.get(recipeId) ?? 'Receta desconocida'
-
-    await handleAddFavorite(chatId, recipeId)
-    await bot.sendMessage(chatId, `¡Receta "${recipeName}" añadida a favoritos! ⭐`)
-    await bot.answerCallbackQuery(callbackQuery.id, { text: '¡Añadidos a favoritos!' })
+    const response = await handleAddFavorite(chatId, recipeId)
+    console.log('response', response)
+    if (response.success === true) {
+      await bot.sendMessage(chatId, '¡Receta añadida a favoritos! ⭐')
+      await bot.answerCallbackQuery(callbackQuery.id, { text: '¡Añadidos a favoritos!' })
+    } else {
+      await bot.sendMessage(chatId, 'La receta ya se encuentra en favoritos.')
+    }
   } catch (err) {
-    console.error('Error al agregar a favoritos:', err)
-    await bot.sendMessage(chatId, '❌ Ocurrió un error al agregar la receta a favoritos.')
+    const error = err as Error
+    console.error('Error al agregar a favoritos:', error)
+    await bot.sendMessage(chatId, error.message)
   }
 }
 

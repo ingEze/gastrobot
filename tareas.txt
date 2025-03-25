@@ -1,0 +1,2 @@
+1. Comando para ver las recetas favoritas
+2. eliminar receta de favoritas

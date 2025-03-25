@@ -4,17 +4,24 @@ import { IRecipeFavorite } from '../types'
 const RecipeFavorite = new mongoose.Schema<IRecipeFavorite>({
   recipeId: {
     type: Number,
-    require: true
+    required: true
   },
-  userId: {
+  telegramId: {
     type: Number,
-    require: true
+    required: true
+  },
+  userUniqueIdentifier: {
+    type: String,
+    required: true,
+    unique: true
   },
   addedAt: {
     type: Date,
     default: Date.now
   }
 })
+
+RecipeFavorite.index({ telegramId: 1, RecipeId: 1 }, { unique: true })
 
 const RecipeFavoriteModel: mongoose.Model<IRecipeFavorite> = mongoose.model<IRecipeFavorite>(
   'RecipeFavorite',
