@@ -173,7 +173,7 @@ class MessageHandlers {
 
       const header = '😍 Aquí puedes ver tus recetas favoritas. Usa el comando /recipe primero para buscar y añadir favoritos: 😍\n\n'
 
-      const favoriteRecipes = await handleGetFavorite(chatId)
+      const favoriteRecipes: string = await handleGetFavorite(chatId)
       console.log('favoriteRecipes TELEGRAMBOT', favoriteRecipes)
       const footer = '\n\n👉 Selecciona la que quieras cocinar!'
 
@@ -300,7 +300,7 @@ const handleAddFavoriteRecipe: HandleFavoriteRecipe = async (callbackQuery, chat
       return
     }
 
-    const response = await handleAddFavorite(chatId, recipeId)
+    const response = await handleAddFavorite(recipeId, chatId)
     console.log('response', response)
     if (response.success === true) {
       await bot.sendMessage(chatId, '¡Receta añadida a favoritos! ⭐')

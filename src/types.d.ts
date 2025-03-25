@@ -1,5 +1,5 @@
 import TelegramBot, { Message } from 'node-telegram-bot-api'
-import { Document } from 'mongoose'
+import { Document, Model } from 'mongoose'
 
 export interface Command {
   command: string
@@ -24,6 +24,15 @@ export interface IRecipeFavorite extends Document {
   indexes?: string[]
 }
 
+export interface IRecipeFavoriteStatic extends Model<IRecipeFavorite> {
+  generateUniqueIdentifier: (telegramId: number) => Promise<string>
+}
+
+export interface IUser extends Document {
+  userId: number
+  uniqueIdentifier: string
+}
+
 export interface RecipeDetails {
   id: number
   title: string
@@ -35,9 +44,9 @@ export interface RecipeDetails {
   image?: string
 }
 
-export type RecipeFavoriteFunction = (recipeId: number, telegramId: number, userUniqueIdentifier: string) => Promise<any>
+export type RecipeFavoriteFunction = (recipeId: number, telegramId: number) => Promise<any>
 
-export type GetRecipeFunction = (telegramId: number, userUniqueIdentifier: string) => Promise<any>
+export type GetRecipeFunction = (telegramId: number) => Promise<any>
 
 export type HandleFavoriteRecipe = (callbackQuery: TelegramBot.CallbackQuery, chatId: number, data: string) => Promise<void>
 

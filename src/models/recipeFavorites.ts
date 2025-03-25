@@ -1,5 +1,6 @@
 import mongoose from 'mongoose'
-import { IRecipeFavorite } from '../types'
+import { IRecipeFavorite, IRecipeFavoriteStatic } from '../types'
+import { randomUUID } from 'node:crypto'
 
 const RecipeFavorite = new mongoose.Schema<IRecipeFavorite>({
   recipeId: {
@@ -12,8 +13,7 @@ const RecipeFavorite = new mongoose.Schema<IRecipeFavorite>({
   },
   userUniqueIdentifier: {
     type: String,
-    required: true,
-    unique: true
+    required: true
   },
   addedAt: {
     type: Date,
@@ -23,7 +23,18 @@ const RecipeFavorite = new mongoose.Schema<IRecipeFavorite>({
 
 RecipeFavorite.index({ telegramId: 1, RecipeId: 1 }, { unique: true })
 
-const RecipeFavoriteModel: mongoose.Model<IRecipeFavorite> = mongoose.model<IRecipeFavorite>(
+RecipeFavorite.statics.generateUniqueIdentifier = async function (telegramId: number): Promise<string> {
+  const existingIdentifier = await this.findOne({ telegramId })
+  if (existingIdentifier !== null) return existingIdentifier.userUniqueIdentifier
+
+  const newIdentifier = randomUUID()
+
+  await this.create({ telegramId, userUniqueIdentifier: newIdentifier })
+
+  return newIdentifier
+}
+
+const RecipeFavoriteModel = mongoose.model<IRecipeFavorite, IRecipeFavoriteStatic>(
   'RecipeFavorite',
   RecipeFavorite
 )

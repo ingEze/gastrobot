@@ -1,12 +1,13 @@
 import { GetRecipeFunction, RecipeFavoriteFunction } from '../types'
 import RecipeFavoriteModel from '../models/recipeFavorites'
 
-export const addFavorite: RecipeFavoriteFunction = async (recipeId, telegramId, userUniqueIdentifier) => {
+export const addFavorite: RecipeFavoriteFunction = async (recipeId, telegramId) => {
   try {
+    const userUniqueIdentifier = RecipeFavoriteModel.generateUniqueIdentifier(telegramId)
+
     const existingFavorite = await RecipeFavoriteModel.findOne({
       recipeId,
-      telegramId,
-      userUniqueIdentifier
+      telegramId
     })
 
     if ((existingFavorite != null)) {
@@ -36,17 +37,18 @@ export const addFavorite: RecipeFavoriteFunction = async (recipeId, telegramId, 
   }
 }
 
-export const getFavoriteRecipe: GetRecipeFunction = async (telegramId, userUniqueIdentifier) => {
+export const getFavoriteRecipe: GetRecipeFunction = async (telegramId) => {
+  console.log('telegramId', telegramId)
   try {
-    const favoriteRecipes = await RecipeFavoriteModel.find({
-      telegramId,
-      userUniqueIdentifier
-    })
+    const favoriteRecipes = await RecipeFavoriteModel.find({ telegramId })
+    console.log('favoriteRecipe [getFavoriteRecipe]{service}', favoriteRecipes)
+    if (favoriteRecipes.length === 0) {
+      return 'No tienes recetas favoritas aún 📖'
+    }
 
-    if (favoriteRecipes.length === 0) return 'No tienes recetas favoritas aún 📖'
-
-    const recipeList = favoriteRecipes.map(recipe =>
-      `🍽 Receta ${recipe.recipeId} (Añadida el: ${recipe.addedAt.toLocaleDateString()})`
+    const recipeList = favoriteRecipes.map((recipe: { recipeId: number, addedAt: Date }) => {
+      return `🍽️ Receta ID: ${recipe.recipeId} (Añadida el: ${recipe.addedAt.toLocaleDateString()})`
+    }
     ).join('\n')
 
     return recipeList
