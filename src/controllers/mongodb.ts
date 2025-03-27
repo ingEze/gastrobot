@@ -5,6 +5,6 @@ export const handleAddFavorite: RecipeFavoriteFunction = async (recipeId, telegr
   return await addFavorite(recipeId, telegramId)
 }
 
-export const handleGetFavorite: GetRecipeFunction = async (telegramId, userUniqueIdentifier) => {
-  return await getFavoriteRecipe(telegramId, userUniqueIdentifier)
+export const handleGetFavorite: GetRecipeFunction = async (telegramId) => {
+  return await getFavoriteRecipe(telegramId)
 }

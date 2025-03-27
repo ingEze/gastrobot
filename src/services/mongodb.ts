@@ -1,55 +1,76 @@
+import { MongooseError } from 'mongoose'
 import { GetRecipeFunction, RecipeFavoriteFunction } from '../types'
 import RecipeFavoriteModel from '../models/recipeFavorites'
+import { getRecipeId } from '../controllers/api'
 
 export const addFavorite: RecipeFavoriteFunction = async (recipeId, telegramId) => {
+  console.log('params:', { recipeId, telegramId })
+
+  if (recipeId === undefined || recipeId === null || telegramId === undefined || telegramId === null) {
+    return {
+      success: false,
+      message: 'RecipeId y TelegramId son obligatorios'
+    }
+  }
+
   try {
-    const userUniqueIdentifier = RecipeFavoriteModel.generateUniqueIdentifier(telegramId)
+    const userUniqueIdentifier = await RecipeFavoriteModel.generateUniqueIdentifier(telegramId)
 
     const existingFavorite = await RecipeFavoriteModel.findOne({
       recipeId,
       telegramId
     })
 
-    if ((existingFavorite != null)) {
-      console.log('Favorito existente encontrado:', existingFavorite)
+    if (existingFavorite != null) {
       return {
         success: false,
-        message: 'This recipe already in your favorites'
+        message: 'La receta ya se encuentra agregada a favoritos.'
       }
     }
 
     const newRecipe = new RecipeFavoriteModel({
       recipeId,
       telegramId,
-      userUniqueIdentifier
+      userUniqueIdentifier,
+      addedAt: new Date()
     })
 
     await newRecipe.save()
 
     return {
       success: true,
-      message: 'Recipe added in your favorites.'
+      message: 'Receta agregada a favoritos.'
     }
-  } catch (err) {
-    const error = err as Error
-    console.error('Error in DB service:', error.message)
-    throw err
+  } catch (error) {
+    if (error instanceof MongooseError && 'code' in error && error.code === 11000) {
+      return {
+        success: false,
+        message: 'La receta ya está en tus favoritos'
+      }
+    }
+    console.error('Error en el servicio de base de datos:', error instanceof Error ? error.message : error)
+    throw error
   }
 }
 
 export const getFavoriteRecipe: GetRecipeFunction = async (telegramId) => {
-  console.log('telegramId', telegramId)
   try {
     const favoriteRecipes = await RecipeFavoriteModel.find({ telegramId })
-    console.log('favoriteRecipe [getFavoriteRecipe]{service}', favoriteRecipes)
     if (favoriteRecipes.length === 0) {
       return 'No tienes recetas favoritas aún 📖'
     }
 
-    const recipeList = favoriteRecipes.map((recipe: { recipeId: number, addedAt: Date }) => {
-      return `🍽️ Receta ID: ${recipe.recipeId} (Añadida el: ${recipe.addedAt.toLocaleDateString()})`
-    }
-    ).join('\n')
+    const recipeList = await Promise.all(favoriteRecipes.map(async (recipe) => {
+      const recipeDetails = await getRecipeId(recipe.recipeId)
+      const recipeId = recipeDetails.id
+      const title: string = recipeDetails?.title ?? 'No recipe title'
+      const favoriteAdded = recipe.addedAt.toLocaleDateString()
+      return {
+        recipeId,
+        title,
+        favoriteAdded
+      }
+    }))
 
     return recipeList
   } catch (err) {
