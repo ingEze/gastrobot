@@ -1,6 +1,6 @@
 import TelegramBot, { InlineKeyboardButton, Message } from 'node-telegram-bot-api'
 import { config } from './config/config.js'
-import { Command, UserState, RecipeDetails, HandleFavoriteRecipe, HandleShowRecipe, FavoriteRecipeMessage } from './types.js'
+import { Command, UserState, RecipeDetails, HandleFavoriteRecipe, FavoriteRecipeMessage } from './types.js'
 import { getAllRecipes, getRecipeId } from './controllers/api.js'
 import { handleAddFavorite, handleGetFavorite } from './controllers/mongodb.js'
 
@@ -16,28 +16,40 @@ const userRecipes: Record<number, Map<number, string>> = {}
 // eslint-disable-next-line @typescript-eslint/no-extraneous-class
 class MessageHandlers {
   static async sendWelcomeMessage (msg: Message): Promise<void> {
-    const userName = msg.from?.first_name ?? 'User'
+    const username = msg.from?.first_name ?? 'User'
     const WELCOME_MESSAGE = `
-¡Hola ${userName}! 👋 Soy GastroBot, tu asistente culinario personal.
+¡Hola ${username}! 👋 Soy GastroBot, tu asistente culinario personal.
 
-¿Qué te gustaría hacer?
-🔍 /recipe - Buscar una receta
-❓ /help - Ver todos los comandos disponibles
-ℹ️ /about - Conocer más sobre mí
+🔹 ¿Cómo usarme?
 
-¡Empecemos a cocinar! 🍳
+1️⃣ Usa el comando /recipe y dime qué tipo de receta buscas (ej: pizza, tea, coffee).
+2️⃣ Elige si quieres buscar con ingredientes específicos (ej: tomate albahaca sal).
+3️⃣ Indica cuántas recetas quieres ver ingresando un número positivo.
+
+📌 Ejemplo de uso:
+/recipe → pizza → tomate albahaca sal → 3
+
+🍕 ¡Y listo! Te mostraré las mejores opciones para que cocines algo increíble.
+
+💾 También puedes guardar tus recetas favoritas y explorarlas más tarde utilizando el comando /favorite.
+
+❓ ¿Necesitas ayuda? Usa el comando /help para obtener más información.
+
+¡Dime qué quieres preparar y comencemos a cocinar juntos! 🥗🍰🔥
     `
     await bot.sendMessage(msg.chat.id, WELCOME_MESSAGE)
   }
 
   static async handleHelpCommand (msg: Message): Promise<void> {
-    const header = '🌟 *¡Bienvenido a GastroBot!* 🌟\n\nAquí tienes los comandos disponibles:\n\n'
+    const username = msg.from?.first_name ?? 'Chef'
+    const header = `👋 ¡Hola *${username}*! Bienvenido a *GastroBot*, tu asistente culinario personal.\n\n` +
+                   '📌 Aquí tienes los comandos disponibles para aprovechar al máximo el bot:\n\n'
 
     const commandList = Object.values(commands)
-      .map(cmd => `${cmd.emoji} ${cmd.command} - ${cmd.description}`)
+      .map(cmd => `🔹 *${cmd.command}* - ${cmd.description}`)
       .join('\n')
 
-    const footer = '\n\n👉 ¡Explora y disfruta de todas las funcionalidades que GastroBot tiene para ofrecerte! 😊'
+    const footer = '\n\nℹ️ *¿Necesitas más ayuda?* Escríbeme y estaré encantado de asistirte. ¡Feliz cocina! 🍳🔥'
 
     const message = header + commandList + footer
 
@@ -182,10 +194,10 @@ class MessageHandlers {
       }))
 
       const recipeListMessage = favoriteRecipesData
-        .map((recipe, index) => `📌 ${index + 1}. *${recipe.title}* - (Añadida el *${recipe.favoriteAdded}*)`)
+        .map((recipe, index) => `📌 ${index + 1}. ${recipe.title} - (Añadida el ${recipe.favoriteAdded})`)
         .join('\n')
 
-      const footer = '\n\n👨‍🍳 *Elige una receta y ponte manos a la obra!* 🔥'
+      const footer = '\n\n 👨‍🍳 Elige una receta y ponte manos a la obra! 🔥'
 
       const message = header + recipeListMessage + footer
 
@@ -254,34 +266,33 @@ GitHub: https://github.com/ingEze
   },
   '/favorite': {
     command: '/favorite',
-    description: 'Your recipes favorites',
+    description: 'Tus recetas favoritas',
     action: MessageHandlers.handleFavoriteCommand,
     emoji: '🤩'
   }
 }
 
-const handleShowRecipe: HandleShowRecipe = async (callbackQuery, chatId, recipeId) => {
-  try {
-    const recipe = await getRecipeId(recipeId) as RecipeDetails
-    const recipeName = userRecipes[chatId]?.get(recipeId) ?? 'Receta desconocida'
+const showRecipeMessage = async (chatId: number, recipeId: number, textData: string, callbackData: string): Promise<void> => {
+  const recipe = await getRecipeId(recipeId) as RecipeDetails
+  const recipeName = userRecipes[chatId]?.get(recipeId) ?? 'Receta desconocida'
 
-    if (recipe === null || recipe === undefined) {
-      await bot.sendMessage(chatId, `No se pudo obtener información para: ${recipeName}`)
-      return
-    }
+  if (recipe === null || recipe === undefined) {
+    await bot.sendMessage(chatId, `No se pudo obtener información para: ${recipeName}`)
+    return
+  }
 
-    // Función auxiliar para sanitizar strings HTML de forma segura
-    const sanitizeHtml = (text: string | undefined): string => {
-      return (text != null) ? text.replace(/<\/?[^>]+(>|$)/g, '') : ''
-    }
+  // Función auxiliar para sanitizar strings HTML de forma segura
+  const sanitizeHtml = (text: string | undefined): string => {
+    return (text != null) ? text.replace(/<\/?[^>]+(>|$)/g, '') : ''
+  }
 
-    // Función para manejar de forma segura valores que podrían ser undefined
-    const safeValue = <T>(value: T | undefined, defaultValue: string): string => {
-      if (value === undefined || value === null) return defaultValue
-      return String(value)
-    }
+  // Función para manejar de forma segura valores que podrían ser undefined
+  const safeValue = <T>(value: T | undefined, defaultValue: string): string => {
+    if (value === undefined || value === null) return defaultValue
+    return String(value)
+  }
 
-    const formattedMessage = [
+  const formattedMessage = [
       `📜 *Detalles de la receta: ${recipeName}*`,
       '',
       (recipe.summary != null) ? `📝 *Resumen:* ${sanitizeHtml(recipe.summary)}` : '',
@@ -295,29 +306,24 @@ const handleShowRecipe: HandleShowRecipe = async (callbackQuery, chatId, recipeI
       `❤️ *Puntuación:* ${(recipe.spoonacularScore != null)
         ? recipe.spoonacularScore.toFixed(1)
         : 'No disponible'}/100`
-    ].join('\n')
+  ].join('\n')
 
-    await bot.sendMessage(chatId, formattedMessage, {
-      parse_mode: 'Markdown',
-      disable_web_page_preview: true,
-      reply_markup: {
-        inline_keyboard: [
-          [{ text: '♥ Add to favorite', callback_data: `add_to_favorite_${recipeId}` }]
-        ]
-      }
-    })
-    await bot.answerCallbackQuery(callbackQuery.id)
-  } catch (err) {
-    console.error('Error al obtener detalles de la receta:', err)
-    await bot.sendMessage(chatId, 'No se pudo obtener los detalles de la receta seleccionada')
-  }
+  await bot.sendMessage(chatId, formattedMessage, {
+    parse_mode: 'Markdown',
+    disable_web_page_preview: true,
+    reply_markup: {
+      inline_keyboard: [
+        [{ text: textData, callback_data: `${callbackData}${recipeId}` }]
+      ]
+    }
+  })
 }
 
 const handleAddFavoriteRecipe: HandleFavoriteRecipe = async (callbackQuery, chatId, data) => {
   try {
-    const recipeId = Number(data.split('_')[3])
+    const recipeId = Number(data.split('_')[2])
     if (isNaN(recipeId)) {
-      console.error(`ID de receta inválido: ${data.split('_')[3]}`)
+      console.error(`ID de receta inválido: ${data.split('_')[2]}`)
       return
     }
 
@@ -364,9 +370,17 @@ bot.on('callback_query', async (callbackQuery) => {
   if (data.startsWith('show_recipe_')) {
     const recipeId = Number(data.split('_')[2])
     if (isNaN(recipeId)) return
-    await handleShowRecipe(callbackQuery, chatId, recipeId)
+    await handleAddFavoriteRecipe(callbackQuery, chatId, data) // no tocar
   } else if (data.startsWith('add_to_favorite_')) {
-    await handleAddFavoriteRecipe(callbackQuery, chatId, data)
+    const recipeId = Number(data.split('_')[3])
+    const text = '♥ Add to favorite'
+    const callbackData = 'recipe_in_favorite_'
+    await showRecipeMessage(chatId, recipeId, text, callbackData)
+  } else if (data.startsWith('recipe_in_favorite_')) {
+    const recipeId = Number(data.split('_')[3])
+    const text = '🗑 Remove to favorite'
+    const callbackData = 'remove_recipe_in_favorite_'
+    await showRecipeMessage(chatId, recipeId, text, callbackData)
   }
 })
 

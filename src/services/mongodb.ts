@@ -4,8 +4,6 @@ import RecipeFavoriteModel from '../models/recipeFavorites'
 import { getRecipeId } from '../controllers/api'
 
 export const addFavorite: RecipeFavoriteFunction = async (recipeId, telegramId) => {
-  console.log('params:', { recipeId, telegramId })
-
   if (recipeId === undefined || recipeId === null || telegramId === undefined || telegramId === null) {
     return {
       success: false,
